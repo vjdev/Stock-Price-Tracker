@@ -10,6 +10,14 @@ final class StockPriceTrackerTests: XCTestCase {
         XCTAssertEqual(AppConfiguration.stockFeedEndpoint.path, "/raw")
     }
 
+    func testAppLoggerCreatesLoggerForCategory() {
+        let logger = AppLogger.logger(category: "UnitTest")
+        logger.info("Logger is available for the requested category.")
+
+        let fallbackLogger = AppLogger.logger(category: "UnitTestFallback", bundleIdentifier: nil)
+        fallbackLogger.info("Logger falls back to the default subsystem when no bundle ID exists.")
+    }
+
     func testStockIdentitySignAndWatchlistMetadataAreConsistent() {
         let positive = stock("AAA", price: 10, change: 0)
         let negative = stock("BBB", price: 10, change: -0.01)
@@ -22,6 +30,11 @@ final class StockPriceTrackerTests: XCTestCase {
         XCTAssertTrue(StockWatchlist.companies.allSatisfy {
             !$0.symbol.isEmpty && !$0.name.isEmpty && !$0.description.isEmpty
         })
+    }
+
+    func testStockPriceUpdateDefaultsAbsoluteChangeToZeroForInitialPayloads() {
+        let update = StockPriceUpdate(symbol: "AAPL", price: 100, change: 0)
+        XCTAssertEqual(update.absoluteChange, 0)
     }
 
     func testSortOptionsHaveStableIdentifiersForEverySortMode() {
@@ -408,6 +421,141 @@ final class StockPriceTrackerTests: XCTestCase {
         }
     }
 
+    func testNetworkManagerSendsReceivesAndDecodesStringAndDataMessages() async throws {
+        let socket = TestWebSocketTask()
+        let network = NetworkManager(taskFactory: { _ in socket })
+        let endpoint = URL(string: "wss://example.test/stock-feed")!
+        let sessionID = network.connect(to: endpoint)
+
+        try await network.send("request", sessionID: sessionID)
+        socket.enqueue(.string("text response"))
+        let textResponse = try await network.receive(sessionID: sessionID)
+        XCTAssertEqual(textResponse, "text response")
+
+        socket.enqueue(.data(Data("data response".utf8)))
+        let dataResponse = try await network.receive(sessionID: sessionID)
+        XCTAssertEqual(dataResponse, "data response")
+        XCTAssertEqual(socket.sentMessages.count, 1)
+        XCTAssertTrue(socket.isResumed)
+
+        network.disconnect(sessionID: sessionID)
+        XCTAssertTrue(socket.isCancelled)
+    }
+
+    func testNetworkManagerRejectsInvalidUTF8AndClassifiesTransportFailure() async {
+        let socket = TestWebSocketTask()
+        let network = NetworkManager(taskFactory: { _ in socket })
+        let sessionID = network.connect(to: URL(string: "wss://example.test/stock-feed")!)
+
+        socket.enqueue(.data(Data([0xFF])))
+        do {
+            _ = try await network.receive(sessionID: sessionID)
+            XCTFail("Invalid UTF-8 data should be rejected")
+        } catch {
+            XCTAssertEqual(error as? WebSocketError, .invalidUTF8)
+        }
+
+        socket.receiveError = URLError(.networkConnectionLost)
+        do {
+            _ = try await network.receive(sessionID: sessionID)
+            XCTFail("Transport errors should be classified")
+        } catch let error as WebSocketError {
+            guard case .transportFailure = error else {
+                return XCTFail("Expected a transport failure, got \(error)")
+            }
+        } catch {
+            XCTFail("Expected WebSocketError, got \(error)")
+        }
+
+        network.disconnect(sessionID: sessionID)
+    }
+
+    func testNetworkManagerClassifiesSendCancellation() async {
+        let socket = TestWebSocketTask()
+        socket.sendError = URLError(.cancelled)
+        let network = NetworkManager(taskFactory: { _ in socket })
+        let sessionID = network.connect(to: URL(string: "wss://example.test/stock-feed")!)
+
+        do {
+            try await network.send("request", sessionID: sessionID)
+            XCTFail("Cancelled sends should be classified")
+        } catch {
+            XCTAssertEqual(error as? WebSocketError, .connectionReplaced)
+        }
+
+        network.disconnect(sessionID: sessionID)
+    }
+
+    func testNetworkManagerRejectsCompletionFromReplacedInFlightSend() async {
+        let socket = TestWebSocketTask()
+        socket.blockNextSend = true
+        let network = NetworkManager(taskFactory: { _ in socket })
+        let endpoint = URL(string: "wss://example.test/stock-feed")!
+        let sessionID = network.connect(to: endpoint)
+        let sendBlocked = expectation(description: "Send suspended before it completes")
+        socket.onSendBlocked = { sendBlocked.fulfill() }
+
+        let sendTask = Task {
+            try await network.send("request", sessionID: sessionID)
+        }
+        await fulfillment(of: [sendBlocked], timeout: 3)
+        _ = network.connect(to: endpoint)
+        socket.completePendingSend()
+
+        do {
+            try await sendTask.value
+            XCTFail("A send completing on a replaced session must be rejected")
+        } catch {
+            XCTAssertEqual(error as? WebSocketError, .connectionReplaced)
+        }
+    }
+
+    func testURLSessionWebSocketAdapterClassifiesUnavailableServer() async {
+        let network = NetworkManager()
+        let sessionID = network.connect(to: URL(string: "ws://127.0.0.1:1/stock-feed")!)
+        defer { network.disconnect(sessionID: sessionID) }
+
+        do {
+            try await network.send("request", sessionID: sessionID)
+            XCTFail("An unavailable loopback server should fail the WebSocket send")
+        } catch let error as WebSocketError {
+            guard case .transportFailure = error else {
+                return XCTFail("Expected a transport failure, got \(error)")
+            }
+        } catch {
+            XCTFail("Expected WebSocketError, got \(error)")
+        }
+
+        do {
+            _ = try await network.receive(sessionID: sessionID)
+            XCTFail("Receiving from an unavailable server should fail")
+        } catch let error as WebSocketError {
+            guard case .transportFailure = error else {
+                return XCTFail("Expected a transport failure, got \(error)")
+            }
+        } catch {
+            XCTFail("Expected WebSocketError, got \(error)")
+        }
+    }
+
+    func testNetworkManagerIgnoresDisconnectFromReplacedSession() {
+        let firstSocket = TestWebSocketTask()
+        let secondSocket = TestWebSocketTask()
+        var sockets = [firstSocket, secondSocket]
+        let network = NetworkManager(taskFactory: { _ in sockets.removeFirst() })
+        let endpoint = URL(string: "wss://example.test/stock-feed")!
+
+        let oldSessionID = network.connect(to: endpoint)
+        let currentSessionID = network.connect(to: endpoint)
+        network.disconnect(sessionID: oldSessionID)
+
+        XCTAssertTrue(firstSocket.isCancelled)
+        XCTAssertFalse(secondSocket.isCancelled)
+
+        network.disconnect(sessionID: currentSessionID)
+        XCTAssertTrue(secondSocket.isCancelled)
+    }
+
     func testNetworkErrorClassificationMarksProtocolErrorsNonRetryable() {
         let terminalErrors: [WebSocketError] = [
             .invalidUTF8, .unsupportedMessage, .invalidPayload, .unexpectedEcho
@@ -792,4 +940,59 @@ private final class EchoingSocket: WebSocketManaging {
         pendingReceives.removeValue(forKey: sessionID)?.resume(throwing: WebSocketError.connectionReplaced)
     }
 
+}
+
+@MainActor
+private final class TestWebSocketTask: WebSocketTasking {
+    private var incomingMessages: [URLSessionWebSocketTask.Message] = []
+    private var nextIncomingMessage = 0
+    private(set) var sentMessages: [URLSessionWebSocketTask.Message] = []
+    private(set) var isResumed = false
+    private(set) var isCancelled = false
+    var receiveError: Error?
+    var sendError: Error?
+    var blockNextSend = false
+    var onSendBlocked: (() -> Void)?
+    private var pendingSend: CheckedContinuation<Void, Error>?
+
+    func resume() {
+        isResumed = true
+    }
+
+    func send(_ message: URLSessionWebSocketTask.Message) async throws {
+        if let sendError {
+            throw sendError
+        }
+        sentMessages.append(message)
+        guard blockNextSend else { return }
+        blockNextSend = false
+        try await withCheckedThrowingContinuation {
+            pendingSend = $0
+            onSendBlocked?()
+        }
+    }
+
+    func receive() async throws -> URLSessionWebSocketTask.Message {
+        if let receiveError {
+            throw receiveError
+        }
+        guard incomingMessages.indices.contains(nextIncomingMessage) else {
+            throw WebSocketError.notConnected
+        }
+        defer { nextIncomingMessage += 1 }
+        return incomingMessages[nextIncomingMessage]
+    }
+
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        isCancelled = true
+    }
+
+    func enqueue(_ message: URLSessionWebSocketTask.Message) {
+        incomingMessages.append(message)
+    }
+
+    func completePendingSend() {
+        pendingSend?.resume(returning: ())
+        pendingSend = nil
+    }
 }

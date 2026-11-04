@@ -4,12 +4,17 @@ import os
 @MainActor
 final class NetworkManager: WebSocketManaging {
     private let logger = AppLogger.logger(category: "WebSocket")
-    private var task: URLSessionWebSocketTask?
+    private let taskFactory: (URL) -> WebSocketTasking
+    private var task: WebSocketTasking?
     private var activeSessionID: UUID?
+
+    init(taskFactory: @escaping (URL) -> WebSocketTasking = URLSessionWebSocketTaskAdapter.init(endpoint:)) {
+        self.taskFactory = taskFactory
+    }
 
     func connect(to endpoint: URL) -> UUID {
         disconnectCurrent()
-        let task = URLSession.shared.webSocketTask(with: endpoint)
+        let task = taskFactory(endpoint)
         let sessionID = UUID()
         self.task = task
         activeSessionID = sessionID
@@ -75,5 +80,38 @@ final class NetworkManager: WebSocketManaging {
             return .connectionReplaced
         }
         return .classify(error)
+    }
+}
+
+@MainActor
+protocol WebSocketTasking: AnyObject {
+    func resume()
+    func send(_ message: URLSessionWebSocketTask.Message) async throws
+    func receive() async throws -> URLSessionWebSocketTask.Message
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?)
+}
+
+@MainActor
+private final class URLSessionWebSocketTaskAdapter: WebSocketTasking {
+    private let task: URLSessionWebSocketTask
+
+    init(endpoint: URL) {
+        task = URLSession.shared.webSocketTask(with: endpoint)
+    }
+
+    func resume() {
+        task.resume()
+    }
+
+    func send(_ message: URLSessionWebSocketTask.Message) async throws {
+        try await task.send(message)
+    }
+
+    func receive() async throws -> URLSessionWebSocketTask.Message {
+        try await task.receive()
+    }
+
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        task.cancel(with: closeCode, reason: reason)
     }
 }

@@ -2,7 +2,10 @@ import Foundation
 import OSLog
 
 enum AppLogger {
-    static func logger(category: String) -> Logger {
-        Logger(subsystem: Bundle.main.bundleIdentifier ?? "StockTracker", category: category)
+    static func logger(
+        category: String,
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier
+    ) -> Logger {
+        Logger(subsystem: bundleIdentifier ?? "StockTracker", category: category)
     }
 }
