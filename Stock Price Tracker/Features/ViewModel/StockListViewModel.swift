@@ -37,14 +37,10 @@ final class StockListViewModel: ObservableObject {
                 $0.name.localizedCaseInsensitiveContains(searchQuery)
         }
         switch sortOption {
-        case .priceAscending:
-            return visibleStocks.sorted { $0.price == $1.price ? $0.symbol < $1.symbol : $0.price < $1.price }
-        case .priceDescending:
-            return visibleStocks.sorted { $0.price == $1.price ? $0.symbol < $1.symbol : $0.price > $1.price }
-        case .changeAscending:
-            return visibleStocks.sorted { $0.change == $1.change ? $0.symbol < $1.symbol : $0.change < $1.change }
-        case .changeDescending:
-            return visibleStocks.sorted { $0.change == $1.change ? $0.symbol < $1.symbol : $0.change > $1.change }
+        case .priceAscending: return sort(visibleStocks, by: \.price, ascending: true)
+        case .priceDescending: return sort(visibleStocks, by: \.price, ascending: false)
+        case .changeAscending: return sort(visibleStocks, by: \.change, ascending: true)
+        case .changeDescending: return sort(visibleStocks, by: \.change, ascending: false)
         }
     }
 
@@ -82,5 +78,20 @@ final class StockListViewModel: ObservableObject {
 
     private func replaceStocks(with snapshot: [Stock]) {
         stocks = snapshot
+    }
+
+    private func sort(
+        _ stocks: [Stock],
+        by keyPath: KeyPath<Stock, Double>,
+        ascending: Bool
+    ) -> [Stock] {
+        stocks.sorted { lhs, rhs in
+            let leftValue = lhs[keyPath: keyPath]
+            let rightValue = rhs[keyPath: keyPath]
+            guard leftValue == rightValue else {
+                return ascending ? leftValue < rightValue : leftValue > rightValue
+            }
+            return lhs.symbol < rhs.symbol
+        }
     }
 }

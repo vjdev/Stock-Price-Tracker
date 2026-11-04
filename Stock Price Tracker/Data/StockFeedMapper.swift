@@ -23,14 +23,12 @@ enum StockFeedMapper {
     }
 
     static func snapshotMessage(_ stocks: [Stock]) -> StockFeedDTO {
-        StockFeedDTO(type: "snapshot", symbols: nil, stocks: stocks, symbol: nil, price: nil, change: nil)
+        StockFeedDTO(type: "snapshot", stocks: stocks)
     }
 
     static func updateMessage(_ update: StockPriceUpdate) -> StockFeedDTO {
         StockFeedDTO(
             type: "update",
-            symbols: nil,
-            stocks: nil,
             symbol: update.symbol,
             price: update.price,
             change: update.change,

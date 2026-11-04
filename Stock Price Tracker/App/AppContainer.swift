@@ -60,18 +60,12 @@ private final class UITestStockRepository: StockRepository {
     let connectionStates: AsyncStream<WebSocketConnectionState>
 
     init() {
-        var snapshotContinuation: AsyncStream<[Stock]>.Continuation!
-        stockSnapshots = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
-            snapshotContinuation = $0
-        }
-        self.snapshotContinuation = snapshotContinuation
-
-        var stateContinuation: AsyncStream<WebSocketConnectionState>.Continuation!
-        connectionStates = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
-            stateContinuation = $0
-        }
-        self.stateContinuation = stateContinuation
-
+        let snapshots = AsyncStream<[Stock]>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        stockSnapshots = snapshots.stream
+        snapshotContinuation = snapshots.continuation
+        let states = AsyncStream<WebSocketConnectionState>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        connectionStates = states.stream
+        stateContinuation = states.continuation
         snapshotContinuation.yield(stocks)
         stateContinuation.yield(.disconnected)
     }

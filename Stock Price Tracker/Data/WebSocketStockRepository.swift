@@ -31,12 +31,12 @@ final class WebSocketStockRepository: StockRepository {
         self.reconnectPolicy = reconnectPolicy
         self.updateInterval = updateInterval
 
-        var snapshots: AsyncStream<[Stock]>.Continuation!
-        stockSnapshots = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { snapshots = $0 }
-        snapshotsContinuation = snapshots
-        var states: AsyncStream<WebSocketConnectionState>.Continuation!
-        connectionStates = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { states = $0 }
-        stateContinuation = states
+        let snapshots = AsyncStream<[Stock]>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        stockSnapshots = snapshots.stream
+        snapshotsContinuation = snapshots.continuation
+        let states = AsyncStream<WebSocketConnectionState>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        connectionStates = states.stream
+        stateContinuation = states.continuation
         snapshotsContinuation.yield([])
         stateContinuation.yield(.disconnected)
     }
@@ -127,7 +127,7 @@ final class WebSocketStockRepository: StockRepository {
         socketSessionID = sessionID
 
         _ = try await roundTrip(
-            StockFeedDTO(type: "subscribe", symbols: StockWatchlist.symbols, stocks: nil, symbol: nil, price: nil, change: nil),
+            StockFeedDTO(type: "subscribe", symbols: StockWatchlist.symbols),
             sessionID: sessionID,
             runID: runID,
             onSuccessfulCommunication: onSuccessfulCommunication

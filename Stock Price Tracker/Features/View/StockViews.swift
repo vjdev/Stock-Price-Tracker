@@ -6,28 +6,7 @@ struct StockListView: View {
     var body: some View {
         List {
             Section {
-                if viewModel.stocks.isEmpty {
-                    ContentUnavailableView(
-                        "market.empty.title",
-                        systemImage: "chart.xyaxis.line",
-                        description: Text("market.empty.message")
-                    )
-                    .listRowBackground(AppTheme.Colors.surface)
-                } else if viewModel.sortedStocks.isEmpty {
-                    ContentUnavailableView.search(text: viewModel.searchQuery)
-                        .listRowBackground(AppTheme.Colors.surface)
-                } else {
-                    ForEach(viewModel.sortedStocks) { stock in
-                        NavigationLink(value: stock.symbol) {
-                            StockRow(stock: stock)
-                        }
-                        .accessibilityIdentifier("stockRow_\(stock.symbol)")
-                        .simultaneousGesture(TapGesture().onEnded {
-                            viewModel.selectStock(symbol: stock.symbol)
-                        })
-                        .listRowBackground(AppTheme.Colors.surface)
-                    }
-                }
+                stockRows
             } header: {
                 HStack(spacing: AppTheme.Spacing.compact) {
                     Text(viewModel.stocks.count, format: .number.locale(.current))
@@ -49,8 +28,38 @@ struct StockListView: View {
             ToolbarItem(placement: .bottomBar) { FeedControl(viewModel: viewModel) }
         }
     }
+}
 
-    private var sortMenu: some View {
+// MARK: - Stock List Components -
+
+private extension StockListView {
+    @ViewBuilder
+    var stockRows: some View {
+        if viewModel.stocks.isEmpty {
+            ContentUnavailableView(
+                "market.empty.title",
+                systemImage: "chart.xyaxis.line",
+                description: Text("market.empty.message")
+            )
+            .listRowBackground(AppTheme.Colors.surface)
+        } else if viewModel.sortedStocks.isEmpty {
+            ContentUnavailableView.search(text: viewModel.searchQuery)
+                .listRowBackground(AppTheme.Colors.surface)
+        } else {
+            ForEach(viewModel.sortedStocks) { stock in
+                NavigationLink(value: stock.symbol) {
+                    StockRow(stock: stock)
+                }
+                .accessibilityIdentifier("stockRow_\(stock.symbol)")
+                .simultaneousGesture(TapGesture().onEnded {
+                    viewModel.selectStock(symbol: stock.symbol)
+                })
+                .listRowBackground(AppTheme.Colors.surface)
+            }
+        }
+    }
+
+    var sortMenu: some View {
         Menu {
             Picker("sort.title", selection: $viewModel.sortOption) {
                 ForEach(StockSortOption.allCases) { option in
@@ -63,6 +72,8 @@ struct StockListView: View {
         .accessibilityIdentifier("sortMenuButton")
     }
 }
+
+// MARK: - Stock Row -
 
 private struct StockRow: View {
     let stock: Stock
@@ -91,6 +102,8 @@ private struct StockRow: View {
     }
 }
 
+// MARK: - Feed Control -
+
 struct FeedControl: View {
     @ObservedObject var viewModel: StockListViewModel
 
@@ -104,15 +117,19 @@ struct FeedControl: View {
                 .foregroundStyle(AppTheme.Colors.secondaryText)
                 .accessibilityIdentifier("feedConnectionState")
             Spacer()
-            Button(action: toggleFeed) {
-                Text(viewModel.connectionState.isRunning ? "feed.stop" : "feed.start")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .accessibilityIdentifier("feedToggleButton")
-            .buttonStyle(.borderedProminent)
-            .tint(viewModel.connectionState.isRunning ? AppTheme.Colors.negative : AppTheme.Colors.accent)
+            feedToggleButton
         }
         .padding(.vertical, AppTheme.Spacing.compact)
+    }
+
+    private var feedToggleButton: some View {
+        Button(action: toggleFeed) {
+            Text(viewModel.connectionState.isRunning ? "feed.stop" : "feed.start")
+                .font(.subheadline.weight(.semibold))
+        }
+        .accessibilityIdentifier("feedToggleButton")
+        .buttonStyle(.borderedProminent)
+        .tint(viewModel.connectionState.isRunning ? AppTheme.Colors.negative : AppTheme.Colors.accent)
     }
 
     private func toggleFeed() {
@@ -123,6 +140,8 @@ struct FeedControl: View {
         }
     }
 }
+
+// MARK: - Change Label -
 
 struct ChangeLabel: View {
     let change: Double

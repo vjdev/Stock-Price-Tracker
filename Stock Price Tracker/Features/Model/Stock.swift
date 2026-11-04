@@ -64,7 +64,7 @@ enum StockWatchlist {
         StockMetadata(symbol: "PFE", name: "Pfizer Inc.", description: "Discovers, develops, and manufactures medicines and vaccines.")
     ]
 
-    static var symbols: [String] { companies.map(\.symbol) }
+    static let symbols = companies.map(\.symbol)
 }
 
 struct StockMetadata: Sendable {
