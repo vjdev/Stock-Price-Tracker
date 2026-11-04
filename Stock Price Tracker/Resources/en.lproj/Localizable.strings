@@ -15,6 +15,7 @@
 "sort.priceDescending" = "Price: Highest first";
 "sort.title" = "Sort";
 "stock.about" = "About";
+"stock.change.absolute" = "Absolute change:";
 "stock.lastUpdated" = "Last updated:";
 "stock.search" = "Search stocks";
 "stock.unavailable.title" = "Stock unavailable";

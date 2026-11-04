@@ -7,4 +7,5 @@ struct StockFeedDTO: Codable, Equatable {
     var symbol: String?
     var price: Double?
     var change: Double?
+    var absoluteChange: Double? = nil
 }

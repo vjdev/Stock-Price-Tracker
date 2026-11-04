@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Stock Model - 
+// MARK: - Stock Model -
 
 struct Stock: Codable, Identifiable, Equatable, Sendable {
     let symbol: String
@@ -8,6 +8,7 @@ struct Stock: Codable, Identifiable, Equatable, Sendable {
     let description: String
     var price: Double
     var change: Double
+    var absoluteChange: Double = 0
     var lastUpdated: Date = .now
 
     var id: String { symbol }
@@ -32,7 +33,7 @@ enum StockSortOption: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Stock Watchlist - 
+// MARK: - Stock Watchlist -
 
 enum StockWatchlist {
     static let companies = [

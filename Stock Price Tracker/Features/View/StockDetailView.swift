@@ -17,15 +17,26 @@ struct StockDetailView: View {
                         Text(stock.symbol)
                             .font(AppTheme.Typography.screenTitle)
                             .foregroundStyle(AppTheme.Colors.primaryText)
+                            .accessibilityIdentifier("stockDetailSymbol")
                         Text(stock.name)
                             .font(AppTheme.Typography.body)
                             .foregroundStyle(AppTheme.Colors.secondaryText)
+                            .accessibilityIdentifier("stockDetailName")
                     }
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.card) {
                         Text(LocaleFormatting.currency(stock.price))
                             .font(.largeTitle.weight(.bold))
                             .contentTransition(.numericText())
                         ChangeLabel(change: stock.change)
+                            .accessibilityIdentifier("stockDetailPercentageChange")
+                        HStack(spacing: AppTheme.Spacing.compact) {
+                            Text("stock.change.absolute")
+                                .accessibilityIdentifier("stockDetailAbsoluteChangeLabel")
+                            Text(LocaleFormatting.currency(stock.absoluteChange))
+                                .accessibilityIdentifier("stockDetailAbsoluteChange")
+                        }
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Colors.secondaryText)
                         HStack(spacing: AppTheme.Spacing.compact) {
                             Text("stock.lastUpdated")
                             Text(stock.lastUpdated, style: .time)

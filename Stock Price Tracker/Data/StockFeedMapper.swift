@@ -14,7 +14,8 @@ enum StockFeedMapper {
                   receivedSymbols.insert(stock.symbol).inserted,
                   stock.price.isFinite,
                   stock.price > 0,
-                  stock.change.isFinite else {
+                  stock.change.isFinite,
+                  stock.absoluteChange.isFinite else {
                 throw WebSocketError.invalidPayload
             }
         }
@@ -26,7 +27,15 @@ enum StockFeedMapper {
     }
 
     static func updateMessage(_ update: StockPriceUpdate) -> StockFeedDTO {
-        StockFeedDTO(type: "update", symbols: nil, stocks: nil, symbol: update.symbol, price: update.price, change: update.change)
+        StockFeedDTO(
+            type: "update",
+            symbols: nil,
+            stocks: nil,
+            symbol: update.symbol,
+            price: update.price,
+            change: update.change,
+            absoluteChange: update.absoluteChange
+        )
     }
 
     static func stockUpdate(from payload: StockFeedDTO) throws -> StockPriceUpdate {
@@ -34,12 +43,19 @@ enum StockFeedMapper {
               let symbol = payload.symbol,
               let price = payload.price,
               let change = payload.change,
+              let absoluteChange = payload.absoluteChange,
               StockWatchlist.symbols.contains(symbol),
               price.isFinite,
               price > 0,
-              change.isFinite else {
+              change.isFinite,
+              absoluteChange.isFinite else {
             throw WebSocketError.invalidPayload
         }
-        return StockPriceUpdate(symbol: symbol, price: price, change: change)
+        return StockPriceUpdate(
+            symbol: symbol,
+            price: price,
+            change: change,
+            absoluteChange: absoluteChange
+        )
     }
 }

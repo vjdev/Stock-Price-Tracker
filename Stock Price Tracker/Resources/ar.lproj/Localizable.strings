@@ -15,6 +15,7 @@
 "sort.priceDescending" = "السعر: الأعلى أولًا";
 "sort.title" = "ترتيب حسب";
 "stock.about" = "نبذة عن";
+"stock.change.absolute" = "التغير المطلق:";
 "stock.lastUpdated" = "آخر تحديث:";
 "stock.search" = "البحث عن الأسهم";
 "stock.unavailable.title" = "السهم غير متاح";

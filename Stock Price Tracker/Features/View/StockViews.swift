@@ -21,6 +21,7 @@ struct StockListView: View {
                         NavigationLink(value: stock.symbol) {
                             StockRow(stock: stock)
                         }
+                        .accessibilityIdentifier("stockRow_\(stock.symbol)")
                         .simultaneousGesture(TapGesture().onEnded {
                             viewModel.selectStock(symbol: stock.symbol)
                         })
@@ -37,6 +38,7 @@ struct StockListView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .accessibilityIdentifier("stockList")
         .scrollContentBackground(.hidden)
         .background(AppTheme.Colors.background)
         .navigationTitle("market.title")
@@ -58,6 +60,7 @@ struct StockListView: View {
         } label: {
             Label("sort.title", systemImage: "arrow.up.arrow.down")
         }
+        .accessibilityIdentifier("sortMenuButton")
     }
 }
 
@@ -99,11 +102,13 @@ struct FeedControl: View {
             Text(viewModel.connectionState.localizedTitle)
                 .font(AppTheme.Typography.caption)
                 .foregroundStyle(AppTheme.Colors.secondaryText)
+                .accessibilityIdentifier("feedConnectionState")
             Spacer()
             Button(action: toggleFeed) {
                 Text(viewModel.connectionState.isRunning ? "feed.stop" : "feed.start")
                     .font(.subheadline.weight(.semibold))
             }
+            .accessibilityIdentifier("feedToggleButton")
             .buttonStyle(.borderedProminent)
             .tint(viewModel.connectionState.isRunning ? AppTheme.Colors.negative : AppTheme.Colors.accent)
         }

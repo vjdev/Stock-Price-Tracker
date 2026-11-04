@@ -9,7 +9,10 @@ final class AppContainer: ObservableObject {
     let coordinator: AppCoordinator
 
     init(repository: StockRepository? = nil, analyticsProviders: [AnalyticsProvider]? = nil) {
-        let repository = repository ?? WebSocketStockRepository(endpoint: AppConfiguration.stockFeedEndpoint)
+        let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        let repository = repository ?? (isUITesting
+            ? UITestStockRepository()
+            : WebSocketStockRepository(endpoint: AppConfiguration.stockFeedEndpoint))
         self.repository = repository
         let providers = analyticsProviders ?? Self.defaultAnalyticsProviders()
         analytics = AnalyticsOrchestrator(providers: providers)
@@ -27,5 +30,58 @@ final class AppContainer: ObservableObject {
         providers.append(MixpanelAnalyticsProvider())
         #endif
         return providers
+    }
+}
+
+@MainActor
+private final class UITestStockRepository: StockRepository {
+    private let snapshotContinuation: AsyncStream<[Stock]>.Continuation
+    private let stateContinuation: AsyncStream<WebSocketConnectionState>.Continuation
+
+    let stocks = [
+        Stock(
+            symbol: "AAPL",
+            name: "Apple Inc.",
+            description: "Consumer technology company.",
+            price: 189.25,
+            change: 1.5,
+            absoluteChange: 2.8
+        ),
+        Stock(
+            symbol: "MSFT",
+            name: "Microsoft Corporation",
+            description: "Software and cloud services company.",
+            price: 420.5,
+            change: -0.75,
+            absoluteChange: -3.15
+        )
+    ]
+    let stockSnapshots: AsyncStream<[Stock]>
+    let connectionStates: AsyncStream<WebSocketConnectionState>
+
+    init() {
+        var snapshotContinuation: AsyncStream<[Stock]>.Continuation!
+        stockSnapshots = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
+            snapshotContinuation = $0
+        }
+        self.snapshotContinuation = snapshotContinuation
+
+        var stateContinuation: AsyncStream<WebSocketConnectionState>.Continuation!
+        connectionStates = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
+            stateContinuation = $0
+        }
+        self.stateContinuation = stateContinuation
+
+        snapshotContinuation.yield(stocks)
+        stateContinuation.yield(.disconnected)
+    }
+
+    func start() {
+        stateContinuation.yield(.connecting)
+        stateContinuation.yield(.connected)
+    }
+
+    func stop() {
+        stateContinuation.yield(.disconnected)
     }
 }

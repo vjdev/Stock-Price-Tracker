@@ -4,6 +4,65 @@ import XCTest
 
 @MainActor
 final class StockPriceTrackerTests: XCTestCase {
+    func testAppConfigurationUsesSecureWebSocketEndpoint() {
+        XCTAssertEqual(AppConfiguration.stockFeedEndpoint.scheme, "wss")
+        XCTAssertEqual(AppConfiguration.stockFeedEndpoint.host, "ws.postman-echo.com")
+        XCTAssertEqual(AppConfiguration.stockFeedEndpoint.path, "/raw")
+    }
+
+    func testStockIdentitySignAndWatchlistMetadataAreConsistent() {
+        let positive = stock("AAA", price: 10, change: 0)
+        let negative = stock("BBB", price: 10, change: -0.01)
+
+        XCTAssertEqual(positive.id, positive.symbol)
+        XCTAssertTrue(positive.isPositive)
+        XCTAssertFalse(negative.isPositive)
+        XCTAssertEqual(StockWatchlist.symbols.count, StockWatchlist.companies.count)
+        XCTAssertEqual(Set(StockWatchlist.symbols).count, StockWatchlist.symbols.count)
+        XCTAssertTrue(StockWatchlist.companies.allSatisfy {
+            !$0.symbol.isEmpty && !$0.name.isEmpty && !$0.description.isEmpty
+        })
+    }
+
+    func testSortOptionsHaveStableIdentifiersForEverySortMode() {
+        XCTAssertEqual(
+            StockSortOption.allCases.map(\.id),
+            ["priceAscending", "priceDescending", "changeAscending", "changeDescending"]
+        )
+    }
+
+    func testLocaleFormattingRespectsSelectedLocale() {
+        let englishCurrency = LocaleFormatting.currency(1234.56, locale: Locale(identifier: "en_US"))
+        let germanCurrency = LocaleFormatting.currency(1234.56, locale: Locale(identifier: "de_DE"))
+        let arabicCurrency = LocaleFormatting.currency(1234.56, locale: Locale(identifier: "ar_EG"))
+        let englishPercentage = LocaleFormatting.percentage(12.34, locale: Locale(identifier: "en_US"))
+        let germanPercentage = LocaleFormatting.percentage(12.34, locale: Locale(identifier: "de_DE"))
+
+        XCTAssertNotEqual(englishCurrency, germanCurrency)
+        XCTAssertNotEqual(englishCurrency, arabicCurrency)
+        XCTAssertNotEqual(englishPercentage, germanPercentage)
+        XCTAssertTrue(englishCurrency.contains("$"))
+        XCTAssertTrue(germanCurrency.contains(","))
+        XCTAssertTrue(englishPercentage.contains("."))
+        XCTAssertTrue(germanPercentage.contains(","))
+    }
+
+    func testAnalyticsEventsExposeExpectedNamesAndProperties() {
+        let cases: [(AnalyticsEvent, String, [String: String])] = [
+            (.stockSelected(symbol: "AAPL"), "stock_selected", ["symbol": "AAPL"]),
+            (.feedStarted, "feed_started", [:]),
+            (.feedStopped, "feed_stopped", [:]),
+            (.connectionEstablished, "connection_established", [:]),
+            (.connectionLost, "connection_lost", [:]),
+            (.sortChanged(type: "priceAscending"), "sort_changed", ["type": "priceAscending"])
+        ]
+
+        for (event, name, properties) in cases {
+            XCTAssertEqual(event.name, name)
+            XCTAssertEqual(event.properties, properties)
+        }
+    }
+
     func testSortingIsDeterministicForEqualPricesAndChanges() async {
         let repository = TestStockRepository()
         let viewModel = makeViewModel(repository: repository)
@@ -57,12 +116,15 @@ final class StockPriceTrackerTests: XCTestCase {
         await waitForPublished(viewModel.$stocks) { $0.first?.price == 10 }
         XCTAssertEqual(detail.stock?.price, 10)
 
-        repository.emit(StockPriceUpdate(symbol: "AAA", price: 15, change: 2))
+        repository.emit(StockPriceUpdate(symbol: "AAA", price: 15, change: 2, absoluteChange: 5))
         await waitForPublished(viewModel.$stocks) { $0.first?.price == 15 }
 
         XCTAssertEqual(repository.stocks.first?.price, 15)
+        XCTAssertEqual(repository.stocks.first?.absoluteChange, 5)
         XCTAssertEqual(detail.stock?.price, 15)
+        XCTAssertEqual(detail.stock?.absoluteChange, 5)
         XCTAssertEqual(viewModel.stocks.first?.price, 15)
+        XCTAssertEqual(viewModel.stocks.first?.absoluteChange, 5)
     }
 
     func testPriceGeneratorProducesValidDeterministicSnapshotsAndUpdates() throws {
@@ -74,7 +136,7 @@ final class StockPriceTrackerTests: XCTestCase {
         XCTAssertEqual(firstSnapshot.map(\.symbol), StockWatchlist.symbols)
         XCTAssertEqual(firstSnapshot.map(\.price), secondSnapshot.map(\.price))
         XCTAssertTrue(firstSnapshot.allSatisfy {
-            $0.price.isFinite && $0.price > 0 && (-2...2).contains($0.change)
+            $0.price.isFinite && $0.price > 0 && $0.change == 0 && $0.absoluteChange == 0
         })
 
         let firstUpdate = try first.makeUpdate()
@@ -83,6 +145,32 @@ final class StockPriceTrackerTests: XCTestCase {
         XCTAssertTrue(StockWatchlist.symbols.contains(firstUpdate.symbol))
         XCTAssertTrue(firstUpdate.price.isFinite && firstUpdate.price > 0)
         XCTAssertTrue(firstUpdate.change.isFinite && (-1.2...1.2).contains(firstUpdate.change))
+        XCTAssertTrue(firstUpdate.absoluteChange.isFinite)
+    }
+
+    func testPriceGeneratorCalculatesAbsoluteAndPercentageMovementFromPriorPrice() throws {
+        var observedPositiveChange = false
+        var observedNegativeChange = false
+
+        for seed in 0..<20 {
+            let generator = StockPriceGenerator(random: SeededRandomNumberGenerator(seed: UInt64(seed)))
+            let snapshot = generator.makeSnapshot()
+            let update = try generator.makeUpdate()
+            let previousPrice = try XCTUnwrap(snapshot.first { $0.symbol == update.symbol }?.price)
+
+            XCTAssertEqual(update.absoluteChange, update.price - previousPrice, accuracy: 0.000_000_1)
+            XCTAssertEqual(update.change, update.absoluteChange / previousPrice * 100, accuracy: 0.000_000_1)
+            observedPositiveChange = observedPositiveChange || update.absoluteChange > 0
+            observedNegativeChange = observedNegativeChange || update.absoluteChange < 0
+        }
+
+        XCTAssertTrue(observedPositiveChange)
+        XCTAssertTrue(observedNegativeChange)
+    }
+
+    func testPriceGeneratorRequiresSnapshotBeforeGeneratingUpdates() {
+        let generator = StockPriceGenerator(random: SeededRandomNumberGenerator(seed: 7))
+        XCTAssertThrowsError(try generator.makeUpdate())
     }
 
     func testMapperRejectsUnknownSymbolsAndInvalidValues() throws {
@@ -106,10 +194,72 @@ final class StockPriceTrackerTests: XCTestCase {
             type: "update",
             symbols: nil,
             stocks: nil,
+            symbol: "AAPL",
+            price: 10,
+            change: 1,
+            absoluteChange: .infinity
+        )))
+        XCTAssertThrowsError(try StockFeedMapper.stockUpdate(from: StockFeedDTO(
+            type: "update",
+            symbols: nil,
+            stocks: nil,
             symbol: "UNKNOWN",
             price: 10,
             change: 1
         )))
+    }
+
+    func testMapperPreservesValidSnapshotAndBuildsFeedMessages() throws {
+        let input = [
+            stock("AAPL", price: 100, change: 1.25),
+            stock("MSFT", price: 200, change: -0.5)
+        ]
+        let snapshotMessage = StockFeedMapper.snapshotMessage(input)
+        XCTAssertEqual(snapshotMessage.type, "snapshot")
+        XCTAssertEqual(try StockFeedMapper.validatedSnapshot(from: snapshotMessage), input)
+
+        let update = StockPriceUpdate(symbol: "AAPL", price: 101, change: 1, absoluteChange: 1)
+        let updateMessage = StockFeedMapper.updateMessage(update)
+        XCTAssertEqual(updateMessage.type, "update")
+        XCTAssertEqual(try StockFeedMapper.stockUpdate(from: updateMessage), update)
+    }
+
+    func testMapperRejectsEmptyDuplicateAndMalformedSnapshots() {
+        let malformedSnapshots = [
+            StockFeedDTO(type: "snapshot", symbols: nil, stocks: [], symbol: nil, price: nil, change: nil),
+            StockFeedDTO(type: "snapshot", symbols: nil, stocks: [
+                stock("AAPL", price: 10, change: 0),
+                stock("AAPL", price: 11, change: 1)
+            ], symbol: nil, price: nil, change: nil),
+            StockFeedDTO(type: "update", symbols: nil, stocks: [
+                stock("AAPL", price: 10, change: 0)
+            ], symbol: nil, price: nil, change: nil),
+            StockFeedDTO(type: "snapshot", symbols: nil, stocks: [
+                stock("AAPL", price: 0, change: 0)
+            ], symbol: nil, price: nil, change: nil),
+            StockFeedDTO(type: "snapshot", symbols: nil, stocks: [
+                stock("AAPL", price: 10, change: .nan)
+            ], symbol: nil, price: nil, change: nil)
+        ]
+
+        for payload in malformedSnapshots {
+            XCTAssertThrowsError(try StockFeedMapper.validatedSnapshot(from: payload))
+        }
+    }
+
+    func testStockFeedDTOEncodesAndDecodesAllPayloadFields() throws {
+        let payload = StockFeedDTO(
+            type: "update",
+            symbols: ["AAPL"],
+            stocks: [stock("AAPL", price: 125.5, change: 2)],
+            symbol: "AAPL",
+            price: 125.5,
+            change: 2,
+            absoluteChange: 2.5
+        )
+        let decoded = try JSONDecoder().decode(StockFeedDTO.self, from: JSONEncoder().encode(payload))
+
+        XCTAssertEqual(decoded, payload)
     }
 
     func testEchoedSnapshotsAndUpdatesAreStoredByRepository() async {
@@ -236,10 +386,83 @@ final class StockPriceTrackerTests: XCTestCase {
         }
     }
 
+    func testNetworkManagerDoesNotLetOldSessionOperateOnReplacement() async {
+        let network = NetworkManager()
+        let endpoint = URL(string: "wss://127.0.0.1:1/raw")!
+        let oldSessionID = network.connect(to: endpoint)
+        let currentSessionID = network.connect(to: endpoint)
+        defer { network.disconnect(sessionID: currentSessionID) }
+
+        do {
+            try await network.send("{}", sessionID: oldSessionID)
+            XCTFail("A replaced session must not send")
+        } catch {
+            XCTAssertEqual(error as? WebSocketError, .connectionReplaced)
+        }
+
+        do {
+            _ = try await network.receive(sessionID: oldSessionID)
+            XCTFail("A replaced session must not receive")
+        } catch {
+            XCTAssertEqual(error as? WebSocketError, .connectionReplaced)
+        }
+    }
+
     func testNetworkErrorClassificationMarksProtocolErrorsNonRetryable() {
-        XCTAssertFalse(WebSocketError.invalidPayload.isRetryable)
-        XCTAssertFalse(WebSocketError.unexpectedEcho.isRetryable)
+        let terminalErrors: [WebSocketError] = [
+            .invalidUTF8, .unsupportedMessage, .invalidPayload, .unexpectedEcho
+        ]
+        XCTAssertTrue(terminalErrors.allSatisfy { !$0.isRetryable })
+        XCTAssertTrue(WebSocketError.notConnected.isRetryable)
+        XCTAssertTrue(WebSocketError.connectionReplaced.isRetryable)
         XCTAssertTrue(WebSocketError.classify(URLError(.notConnectedToInternet)).isRetryable)
+        XCTAssertEqual(WebSocketError.invalidPayload.errorDescription, "The WebSocket returned an invalid stock feed payload.")
+        guard case let .transportFailure(code, _) = WebSocketError.classify(
+            NSError(domain: "UnitTestTransport", code: 17)
+        ) else {
+            return XCTFail("Unknown transport errors should be classified as retryable transport failures")
+        }
+        XCTAssertEqual(code, 17)
+    }
+
+    func testConnectionStateRunningStatusMatchesLifecycle() {
+        XCTAssertFalse(WebSocketConnectionState.disconnected.isRunning)
+        XCTAssertTrue(WebSocketConnectionState.connecting.isRunning)
+        XCTAssertTrue(WebSocketConnectionState.connected.isRunning)
+        XCTAssertTrue(WebSocketConnectionState.reconnecting.isRunning)
+        XCTAssertFalse(WebSocketConnectionState.failed("offline").isRunning)
+    }
+
+    func testRepositoryPublishesLatestConnectionStateAfterRapidStop() async {
+        let repository = WebSocketStockRepository(socket: EchoingSocket())
+        var stateIterator = repository.connectionStates.makeAsyncIterator()
+        _ = await stateIterator.next()
+
+        repository.start()
+        repository.stop()
+
+        let latestState = await stateIterator.next()
+        XCTAssertEqual(latestState, .disconnected)
+        repository.finish()
+    }
+
+    func testRepositoryDoesNotReconnectAfterInvalidPayload() async {
+        let socket = EchoingSocket(response: { _ in "not-json" })
+        let repository = WebSocketStockRepository(socket: socket)
+        let viewModel = makeViewModel(repository: repository)
+        defer { repository.stop() }
+
+        repository.start()
+        await waitForPublished(viewModel.$connectionState) {
+            if case .failed = $0 { return true }
+            return false
+        }
+
+        XCTAssertEqual(socket.connectionCount, 1)
+        guard case let .failed(message) = viewModel.connectionState else {
+            return XCTFail("Expected an invalid payload failure")
+        }
+        XCTAssertFalse(message.isEmpty)
     }
 
     func testCoordinatorIgnoresRepeatedStartsAndPausesForBackground() {
@@ -260,6 +483,87 @@ final class StockPriceTrackerTests: XCTestCase {
         XCTAssertEqual(repository.stopCount, 2)
         XCTAssertEqual(provider.events.filter { $0.name == "feed_started" }.count, 1)
         XCTAssertEqual(provider.events.filter { $0.name == "feed_stopped" }.count, 1)
+    }
+
+    func testCoordinatorTracksConnectionTransitionsAndFeedActions() {
+        let repository = TestStockRepository()
+        let provider = RecordingAnalyticsProvider()
+        let coordinator = AppCoordinator(
+            repository: repository,
+            analytics: AnalyticsOrchestrator(providers: [provider])
+        )
+
+        coordinator.startFeed()
+        coordinator.connectionDidChange(.connected)
+        coordinator.connectionDidChange(.connected)
+        coordinator.connectionDidChange(.reconnecting)
+        coordinator.connectionDidChange(.connected)
+        coordinator.selectStock(symbol: "AAPL")
+        coordinator.changeSort(to: "priceAscending")
+        coordinator.stopFeed()
+
+        XCTAssertEqual(provider.events.map(\.name), [
+            "feed_started", "connection_established", "connection_lost",
+            "connection_established", "stock_selected", "sort_changed", "feed_stopped"
+        ])
+    }
+
+    func testAppContainerUsesInjectedRepositoryAndAnalyticsProvider() {
+        let repository = TestStockRepository()
+        let provider = RecordingAnalyticsProvider()
+        let container = AppContainer(repository: repository, analyticsProviders: [provider])
+
+        XCTAssertTrue(container.repository === repository)
+        container.stockListViewModel.startFeed()
+        container.stockListViewModel.selectStock(symbol: "AAPL")
+
+        XCTAssertEqual(repository.startCount, 1)
+        XCTAssertEqual(provider.events.map(\.name), ["feed_started", "stock_selected"])
+    }
+
+    func testStockListViewModelForwardsFeedSelectionAndSortActions() {
+        let repository = TestStockRepository()
+        let provider = RecordingAnalyticsProvider()
+        let coordinator = AppCoordinator(
+            repository: repository,
+            analytics: AnalyticsOrchestrator(providers: [provider])
+        )
+        let viewModel = StockListViewModel(repository: repository, coordinator: coordinator)
+
+        viewModel.startFeed()
+        viewModel.selectStock(symbol: "AAPL")
+        viewModel.sortOption = .changeAscending
+        viewModel.sortOption = .changeAscending
+        viewModel.stopFeed()
+
+        XCTAssertEqual(repository.startCount, 1)
+        XCTAssertEqual(repository.stopCount, 1)
+        XCTAssertEqual(provider.events.map(\.name), ["feed_started", "stock_selected", "sort_changed", "feed_stopped"])
+    }
+
+    func testStockListViewModelObservesConnectionStateChanges() async {
+        let repository = TestStockRepository()
+        let viewModel = makeViewModel(repository: repository)
+
+        repository.emit(state: .reconnecting)
+        await waitForPublished(viewModel.$connectionState) { $0 == .reconnecting }
+
+        XCTAssertEqual(viewModel.connectionState, .reconnecting)
+    }
+
+    func testStockDetailViewModelTracksAppearingAndRemovedStock() async {
+        let repository = TestStockRepository()
+        let viewModel = makeViewModel(repository: repository)
+        let detail = StockDetailViewModel(symbol: "AAPL", stockListViewModel: viewModel)
+        XCTAssertNil(detail.stock)
+
+        repository.emit(snapshot: [stock("AAPL", price: 10, change: 1)])
+        await waitForPublished(viewModel.$stocks) { !$0.isEmpty }
+        XCTAssertEqual(detail.stock?.price, 10)
+
+        repository.emit(snapshot: [])
+        await waitForPublished(viewModel.$stocks) { $0.isEmpty }
+        XCTAssertNil(detail.stock)
     }
 
     func testMalformedAndUnexpectedEchoesFailTheFeed() async {
@@ -299,7 +603,15 @@ final class StockPriceTrackerTests: XCTestCase {
                 .appendingPathComponent("\(language).lproj")
                 .appendingPathComponent("Localizable.strings")
             let contents = try String(contentsOf: file, encoding: .utf8)
-            for key in ["market.title", "feed.start", "stock.search", "sort.priceAscending"] {
+            let requiredKeys = [
+                "feed.start", "feed.stop", "feed.state.connected", "feed.state.connecting",
+                "feed.state.disconnected", "feed.state.failed", "feed.state.reconnecting",
+                "market.empty.message", "market.empty.title", "market.title", "market.trackedSymbols",
+                "sort.changeAscending", "sort.changeDescending", "sort.priceAscending",
+                "sort.priceDescending", "sort.title", "stock.about", "stock.lastUpdated",
+                "stock.change.absolute", "stock.search", "stock.unavailable.title"
+            ]
+            for key in requiredKeys {
                 XCTAssertTrue(contents.contains("\"\(key)\" ="), "Missing \(key) in \(language)")
             }
         }
@@ -313,8 +625,20 @@ final class StockPriceTrackerTests: XCTestCase {
         return StockListViewModel(repository: repository, coordinator: coordinator)
     }
 
-    private func stock(_ symbol: String, price: Double, change: Double) -> Stock {
-        Stock(symbol: symbol, name: symbol, description: symbol, price: price, change: change)
+    private func stock(
+        _ symbol: String,
+        price: Double,
+        change: Double,
+        absoluteChange: Double = 0
+    ) -> Stock {
+        Stock(
+            symbol: symbol,
+            name: symbol,
+            description: symbol,
+            price: price,
+            change: change,
+            absoluteChange: absoluteChange
+        )
     }
 
     private func waitForPublished<Value>(
@@ -379,10 +703,15 @@ private final class TestStockRepository: StockRepository {
         snapshotContinuation.yield(stocks)
     }
 
+    func emit(state: WebSocketConnectionState) {
+        stateContinuation.yield(state)
+    }
+
     func emit(_ update: StockPriceUpdate) {
         guard let index = stocks.firstIndex(where: { $0.symbol == update.symbol }) else { return }
         stocks[index].price = update.price
         stocks[index].change = update.change
+        stocks[index].absoluteChange = update.absoluteChange
         stocks[index].lastUpdated = .now
         snapshotContinuation.yield(stocks)
     }

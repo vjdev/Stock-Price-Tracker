@@ -196,6 +196,7 @@ final class WebSocketStockRepository: StockRepository {
               let index = stocks.firstIndex(where: { $0.symbol == update.symbol }) else { return }
         stocks[index].price = update.price
         stocks[index].change = update.change
+        stocks[index].absoluteChange = update.absoluteChange
         stocks[index].lastUpdated = .now
         snapshotsContinuation.yield(stocks)
     }
