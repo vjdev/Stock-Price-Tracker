@@ -6,8 +6,24 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		000000000000000002000001 /* StockPriceTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000002000002 /* StockPriceTrackerTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		000000000000000002000013 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = "Stock Price Tracker";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Stock Price Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Stock Price Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000002000002 /* StockPriceTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockPriceTrackerTests.swift; sourceTree = "<group>"; };
+		000000000000000002000003 /* Stock Price TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Stock Price TrackerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -19,6 +35,11 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		000000000000000002000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -31,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* Stock Price Tracker */,
+				000000000000000002000005 /* Tests */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,13 +61,40 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* Stock Price Tracker.app */,
+				000000000000000002000003 /* Stock Price TrackerTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000002000005 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000002000002 /* StockPriceTrackerTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		000000000000000002000006 /* Stock Price TrackerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000002000010 /* Build configuration list for PBXNativeTarget "Stock Price TrackerTests" */;
+			buildPhases = (
+				000000000000000002000007 /* Sources */,
+				000000000000000002000004 /* Frameworks */,
+				000000000000000002000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				000000000000000002000014 /* PBXTargetDependency */,
+			);
+			name = "Stock Price TrackerTests";
+			productName = "Stock Price TrackerTests";
+			productReference = 000000000000000002000003 /* Stock Price TrackerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		000000000000000100000000 /* Stock Price Tracker */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "Stock Price Tracker" */;
@@ -84,6 +133,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				ar,
 				Base,
 			);
 			mainGroup = 000000000000000000000001;
@@ -94,11 +144,17 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* Stock Price Tracker */,
+				000000000000000002000006 /* Stock Price TrackerTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		000000000000000002000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
@@ -107,6 +163,12 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		000000000000000002000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				000000000000000002000001 /* StockPriceTrackerTests.swift in Sources */,
+			);
+		};
 		000000000000000120000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -114,7 +176,49 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		000000000000000002000014 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Stock Price Tracker */;
+			targetProxy = 000000000000000002000013 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		000000000000000002000011 /* Debug configuration for PBXNativeTarget "Stock Price TrackerTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MBYQRLJUG7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vijeeshkpersonalteam.StockPriceTrackerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stock Price Tracker.app/Stock Price Tracker";
+			};
+			name = Debug;
+		};
+		000000000000000002000012 /* Release configuration for PBXNativeTarget "Stock Price TrackerTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MBYQRLJUG7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vijeeshkpersonalteam.StockPriceTrackerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stock Price Tracker.app/Stock Price Tracker";
+			};
+			name = Release;
+		};
 		000000000000000011000000 /* Debug configuration for PBXProject "Stock Price Tracker" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -252,6 +356,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MBYQRLJUG7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -266,10 +371,11 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vijeeshkpersonalteam.StockPriceTracker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -289,6 +395,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MBYQRLJUG7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -303,10 +410,11 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vijeeshkpersonalteam.StockPriceTracker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -324,6 +432,14 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		000000000000000002000010 /* Build configuration list for PBXNativeTarget "Stock Price TrackerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000002000011 /* Debug configuration for PBXNativeTarget "Stock Price TrackerTests" */,
+				000000000000000002000012 /* Release configuration for PBXNativeTarget "Stock Price TrackerTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
 		000000000000000010000000 /* Build configuration list for PBXProject "Stock Price Tracker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
